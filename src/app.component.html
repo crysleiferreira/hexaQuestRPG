@@ -1,0 +1,29 @@
+<div class="relative w-full h-full overflow-hidden font-sans">
+  
+  <!-- 3D World -->
+  <canvas #gameCanvas class="block w-full h-full"></canvas>
+
+  <!-- Start Screen -->
+  @if (gameState().isMainMenu) {
+     <app-start-screen (startGame)="onStartGame()"></app-start-screen>
+  }
+
+  <!-- HUD -->
+  @if (!gameState().isMainMenu) {
+     <app-hud></app-hud>
+  }
+
+  <!-- Inventory Overlay -->
+  @if (showInventory()) {
+     <app-inventory (close)="toggleInventory()"></app-inventory>
+  }
+
+  <!-- Game Over Screen -->
+  @if (playerStats().hp <= 0 && !gameState().isMainMenu) {
+     <div class="absolute inset-0 bg-red-900/90 z-50 flex flex-col items-center justify-center animate-fade-in backdrop-blur-sm">
+        <h1 class="text-8xl font-black text-white mb-2 text-outline tracking-tighter">YOU DIED</h1>
+        <p class="text-2xl text-gray-200 mb-8 font-mono">Stage Reached: {{ gameState().currentLevel }}</p>
+        <button (click)="restartGame()" class="px-10 py-4 bg-white text-black font-bold text-xl rounded hover:bg-gray-200 transition shadow-xl uppercase tracking-widest hover:scale-105 transform">Respawn</button>
+     </div>
+  }
+</div>

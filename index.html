@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HexaQuest 3D</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #111; color: white; user-select: none; }
+    canvas { display: block; outline: none; }
+    
+    /* Custom Scrollbar for inventory */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+    /* Rarity Glows */
+    .glow-common { box-shadow: 0 0 5px #9ca3af; border-color: #9ca3af; }
+    .glow-uncommon { box-shadow: 0 0 8px #22c55e; border-color: #22c55e; }
+    .glow-rare { box-shadow: 0 0 10px #3b82f6; border-color: #3b82f6; }
+    .glow-epic { box-shadow: 0 0 12px #a855f7; border-color: #a855f7; }
+    .glow-legendary { box-shadow: 0 0 15px #f97316; border-color: #f97316; }
+
+    .text-outline {
+      text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    }
+
+    /* Cooldown Animation */
+    @keyframes cooldown-wipe {
+      0% { height: 100%; }
+      100% { height: 0%; }
+    }
+    .animate-cooldown-wipe {
+      animation: cooldown-wipe 0.5s linear forwards;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "rxjs": "https://esm.sh/rxjs@^7.8.2?conditions=es2015",
+    "rxjs/operators": "https://esm.sh/rxjs@^7.8.2/operators?conditions=es2015",
+    "rxjs/ajax": "https://esm.sh/rxjs@^7.8.2/ajax?conditions=es2015",
+    "rxjs/webSocket": "https://esm.sh/rxjs@^7.8.2/webSocket?conditions=es2015",
+    "rxjs/testing": "https://esm.sh/rxjs@^7.8.2/testing?conditions=es2015",
+    "rxjs/fetch": "https://esm.sh/rxjs@^7.8.2/fetch?conditions=es2015",
+    "@angular/compiler": "https://esm.sh/@angular/compiler@^21.1.3?external=rxjs",
+    "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@^21.1.3?external=rxjs",
+    "@angular/core": "https://esm.sh/@angular/core@^21.1.3?external=rxjs",
+    "@angular/common": "https://esm.sh/@angular/common@^21.1.3?external=rxjs",
+    "three": "https://esm.sh/three@^0.182.0?external=rxjs"
+  }
+}
+</script>
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>
