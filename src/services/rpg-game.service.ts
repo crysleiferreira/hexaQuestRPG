@@ -65,7 +65,7 @@ export class RpgGameService {
   
   // Entities
   private playerGroup!: THREE.Group; 
-  private playerMesh!: THREE.Mesh;  
+  private playerModel!: THREE.Object3D; 
 
   private enemies: { 
     mesh: THREE.Mesh, 
@@ -88,7 +88,7 @@ export class RpgGameService {
   
   // Logic Constants
   private readonly MOVEMENT_SPEED = 0.15;
-  public readonly ATTACK_COOLDOWN = 500; 
+  public readonly ATTACK_COOLDOWN = 600; 
   public lastAttackTimestamp = signal(0); 
   private lastAttackTime = 0;
   
@@ -104,26 +104,34 @@ export class RpgGameService {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace; // Correct color management
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(10, 20, 10);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far = 50;
+    dirLight.shadow.camera.left = -20;
+    dirLight.shadow.camera.right = 20;
+    dirLight.shadow.camera.top = 20;
+    dirLight.shadow.camera.bottom = -20;
     this.scene.add(dirLight);
 
     // Player Setup
     this.playerGroup = new THREE.Group();
-    this.playerGroup.position.y = 0.5;
     
-    this.playerMesh = this.assets.getMesh('player');
-    this.playerMesh.position.set(0, 0, 0); 
+    // Load player 
+    this.playerModel = this.assets.getMesh('player') as THREE.Object3D;
+    this.playerModel.position.set(0, 0, 0); 
     
-    this.playerGroup.add(this.playerMesh);
+    this.playerGroup.add(this.playerModel);
     this.scene.add(this.playerGroup);
 
     this.generateLevel();
@@ -139,7 +147,7 @@ export class RpgGameService {
 
   startGame() {
     this.state.gameState.update(s => ({ ...s, isMainMenu: false }));
-    this.playerGroup.position.set(0, 0.5, 0);
+    this.playerGroup.position.set(0, 0, 0);
     this.camera.position.set(0, 14, 12);
     this.camera.lookAt(this.playerGroup.position);
   }
@@ -148,13 +156,14 @@ export class RpgGameService {
   private generateLevel() {
     const level = this.state.gameState().currentLevel;
     
+    // Dynamic Sky Color based on biome
     const biomeIndex = Math.floor((level - 1) / 5);
-    const hues = [220, 280, 10, 120, 40]; 
+    const hues = [210, 270, 20, 140, 0]; 
     const hue = hues[biomeIndex % hues.length];
     
-    const skyColor = new THREE.Color(`hsl(${hue}, 40%, 15%)`);
+    const skyColor = new THREE.Color(`hsl(${hue}, 30%, 20%)`);
     this.scene.background = skyColor;
-    this.scene.fog = new THREE.Fog(skyColor, 10, 50);
+    this.scene.fog = new THREE.Fog(skyColor, 12, 45);
 
     // Cleanup
     this.enemies.forEach(e => {
@@ -174,12 +183,14 @@ export class RpgGameService {
     }
     this.state.activeBoss.set(null);
 
-    // Floor
+    // Floor with Texture
     if (!this.floorPlane) {
         const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorTex = this.assets.getFloorTexture();
         const floorMat = new THREE.MeshStandardMaterial({ 
-            color: 0x1f2937, 
-            roughness: 0.8,
+            map: floorTex,
+            roughness: 0.9,
+            metalness: 0.1,
             side: THREE.DoubleSide 
         });
         this.floorPlane = new THREE.Mesh(floorGeo, floorMat);
@@ -196,7 +207,8 @@ export class RpgGameService {
     
     if (isBoss) {
       this.spawnEnemy(true); 
-      for(let i=0; i<2; i++) this.spawnEnemy(false);
+      // Add minions for boss
+      for(let i=0; i<3; i++) this.spawnEnemy(false);
     } else {
       for (let i = 0; i < enemyCount; i++) {
         this.spawnEnemy(false);
@@ -209,26 +221,23 @@ export class RpgGameService {
         this.state.addNotification(`Entering Stage ${level}`, 'info');
     }
     
-    this.playerGroup.position.set(0, 0.5, 0);
+    this.playerGroup.position.set(0, 0, 0);
   }
 
   private spawnEnemy(isBoss: boolean) {
-    const color = isBoss ? 0xa855f7 : 0xef4444;
-    const mesh = this.assets.getMesh(isBoss ? 'boss' : 'enemy', color);
+    const mesh = this.assets.getMesh(isBoss ? 'boss' : 'enemy') as THREE.Mesh;
     
     const angle = Math.random() * Math.PI * 2;
     const radius = 8 + Math.random() * 12; 
-    mesh.position.set(Math.cos(angle) * radius, isBoss ? 1.5 : 0.6, Math.sin(angle) * radius);
     
-    if (isBoss) {
-      mesh.scale.set(3, 3, 3);
-    }
-
+    // Enemies are models now, position them on the floor (y=0)
+    mesh.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    
     this.scene.add(mesh);
     
     const healthBar = this.assets.createHealthBar();
     healthBar.position.copy(mesh.position);
-    healthBar.position.y += isBoss ? 4 : 1.2;
+    healthBar.position.y += isBoss ? 5 : 2; // Higher health bar for models
     this.scene.add(healthBar);
     
     const level = this.state.gameState().currentLevel;
@@ -243,7 +252,7 @@ export class RpgGameService {
     } else {
         const rand = Math.random();
         if (rand < 0.3) {
-            abilities.push({ name: 'Rock Throw', type: 'ranged', damageMult: 0.8, cooldown: 5000, lastUsed: 0, range: 10, projectileColor: 0x888888 });
+            abilities.push({ name: 'Spit', type: 'ranged', damageMult: 0.8, cooldown: 5000, lastUsed: 0, range: 10, projectileColor: 0x88ff88 });
         } else if (rand > 0.8) {
              abilities.push({ name: 'Smash', type: 'aoe', damageMult: 1.2, cooldown: 6000, lastUsed: 0, range: 3, radius: 2.5, castTime: 1500 });
         }
@@ -263,7 +272,7 @@ export class RpgGameService {
     this.enemies.push(enemy);
 
     if (isBoss) {
-      this.state.activeBoss.set({ name: `Level ${level} Guardian`, hp: baseHp, maxHp: baseHp });
+      this.state.activeBoss.set({ name: `Guardian`, hp: baseHp, maxHp: baseHp });
     }
   }
 
@@ -312,35 +321,13 @@ export class RpgGameService {
     if (moveDir.length() > 0) {
         moveDir.normalize().multiplyScalar(speed);
         this.playerGroup.position.add(moveDir);
-    }
-
-    // Visual Cooldown
-    if (this.playerMesh && this.playerMesh.material) {
-        const mat = this.playerMesh.material as THREE.MeshStandardMaterial; // Note: if array material this might need update but kept simple for now as array access is specific in creation
-        // Note: Logic for emissive flashing might fail if 'material' is array.
-        // Let's fix this for array material support
-        if (Array.isArray(this.playerMesh.material)) {
-           // Apply to base materials
-           this.playerMesh.material.forEach((m: any) => {
-               const timeSinceAttack = now - this.lastAttackTime;
-               if (timeSinceAttack < this.ATTACK_COOLDOWN) {
-                  if (m.emissive) { m.emissive.setHex(0x000000); m.emissiveIntensity = 0; }
-               } else {
-                  // Only flash blue on blue parts, keep yellow constant? 
-                  // Or just flash everything.
-                  if (m.color.getHex() === 0xfacc15) return; // Skip yellow face
-                  if (m.emissive) { m.emissive.setHex(0x3b82f6); m.emissiveIntensity = 0.2 + (Math.sin(now * 0.005) + 1) * 0.3; }
-               }
-           });
-        } else {
-           const mat = this.playerMesh.material as THREE.MeshStandardMaterial;
-            const timeSinceAttack = now - this.lastAttackTime;
-            if (timeSinceAttack < this.ATTACK_COOLDOWN) {
-                 if (mat.emissive) { mat.emissive.setHex(0x000000); mat.emissiveIntensity = 0; }
-            } else {
-                 if (mat.emissive) { mat.emissive.setHex(0x3b82f6); mat.emissiveIntensity = 0.2 + (Math.sin(now * 0.005) + 1) * 0.3; }
-            }
+        
+        // Bobbing animation for player
+        if (this.playerModel) {
+            this.playerModel.position.y = Math.abs(Math.sin(time * 10)) * 0.1;
         }
+    } else {
+        if (this.playerModel) this.playerModel.position.y = 0;
     }
 
     // Camera
@@ -355,7 +342,7 @@ export class RpgGameService {
     // Enemies
     this.enemies.forEach(enemy => {
         enemy.healthBar.position.copy(enemy.mesh.position);
-        enemy.healthBar.position.y += enemy.isBoss ? 4 : 1.2;
+        enemy.healthBar.position.y += enemy.isBoss ? 5 : 2;
         enemy.healthBar.lookAt(this.camera.position); 
         const hpPercent = Math.max(0, enemy.hp / enemy.maxHp);
         enemy.healthBar.children[1].scale.x = hpPercent;
@@ -378,17 +365,23 @@ export class RpgGameService {
             }
         }
 
+        // AI Movement
         if (!abilityUsed) {
-            if (dist > (enemy.isBoss ? 4 : 1.5)) {
+            const attackRange = enemy.isBoss ? 4 : 1.5;
+            if (dist > attackRange) {
                 const dir = new THREE.Vector3().subVectors(this.playerGroup.position, enemy.mesh.position).normalize();
                 const moveSpeed = 0.04 + (this.state.gameState().currentLevel * 0.002);
                 enemy.mesh.position.add(dir.multiplyScalar(enemy.isBoss ? moveSpeed * 0.8 : moveSpeed));
                 enemy.mesh.lookAt(this.playerGroup.position);
+                
+                // Bobbing/Float animation
+                enemy.mesh.position.y = Math.sin(time * 3 + enemy.id) * 0.2;
             } else {
-                if (Math.random() < 0.015) { 
+                // Melee Attack animation
+                if (Math.random() < 0.02) { 
                     this.takeDamage(enemy.stats.damage);
-                    enemy.mesh.position.y += 0.5;
-                    setTimeout(() => enemy.mesh.position.y -= 0.5, 200);
+                    enemy.mesh.position.y += 0.5; // Jump
+                    setTimeout(() => enemy.mesh.position.y = 0, 200);
                 }
             }
         }
@@ -424,7 +417,7 @@ export class RpgGameService {
   }
 
   private spawnEnemyProjectile(enemy: any, ability: EnemyAbility) {
-      const mesh = this.assets.getMesh('projectile', ability.projectileColor);
+      const mesh = this.assets.getMesh('projectile', ability.projectileColor) as THREE.Mesh;
       mesh.position.copy(enemy.mesh.position);
       mesh.position.y = 1;
       const dir = new THREE.Vector3().subVectors(this.playerGroup.position, enemy.mesh.position).normalize();
@@ -481,7 +474,9 @@ export class RpgGameService {
           const zone = this.aoeZones[i];
           const timeLeft = zone.detonationTime - now;
           if (timeLeft > 0) {
-              zone.mesh.scale.setScalar(Math.sin(now * 0.01) * 0.2 + 0.8);
+              // Pulse effect
+              const scale = 1 + Math.sin(now * 0.02) * 0.1;
+              zone.mesh.scale.setScalar(scale);
           } else {
               if (this.playerGroup.position.distanceTo(zone.mesh.position) < zone.radius) {
                   this.takeDamage(zone.damage);
@@ -507,30 +502,26 @@ export class RpgGameService {
           if (intersects.length > 0) {
               const point = intersects[0].point;
               point.y = startPos.y;
-              
-              // Ensure player faces the attack direction immediately
               this.playerGroup.lookAt(point);
-              
               forward = new THREE.Vector3().subVectors(point, startPos).normalize();
           }
       }
       
       const startRot = this.playerGroup.rotation.clone();
       
-      // 2. Visuals
-      this.playerMesh.scale.set(1.3, 1.3, 1.3);
-      this.playerMesh.position.z = -0.7; 
-      setTimeout(() => {
-          this.playerMesh.scale.set(1, 1, 1);
-          this.playerMesh.position.set(0, 0, 0); 
-      }, 150);
+      // 2. Visuals - Scale Punch Effect on Model
+      if (this.playerModel) {
+          const originalScale = this.playerModel.scale.clone();
+          // Lunge animation
+          const lunge = new THREE.Vector3(0, 0, 1).applyEuler(startRot).multiplyScalar(0.5);
+          this.playerGroup.position.add(lunge);
+          setTimeout(() => this.playerGroup.position.sub(lunge), 150);
+      }
 
       this.createSwordSwing(startPos.clone().add(forward.clone().multiplyScalar(0.7)), startRot);
       const damage = this.calculatePlayerDamage();
       
       // 3. Hit Detection
-      // Range: 3.5 units
-      // Angle: Dot product > 0.5 (approx 120 degree cone)
       const range = 3.5;
       const coneThreshold = 0.5;
 
@@ -542,28 +533,41 @@ export class RpgGameService {
              const dirToEnemy = toEnemy.clone().normalize();
              const angle = forward.dot(dirToEnemy);
              
-             // Check Cone OR Point Blank (inside model)
-             if (dist < 1.0 || angle > coneThreshold) { 
+             if (dist < 1.5 || angle > coneThreshold) { 
                  enemy.hp -= damage;
                  this.createHitEffect(enemy.mesh.position.clone().add(new THREE.Vector3(0, 0.8, 0)));
                  this.state.addLog(`Dealt ${damage} damage`, 'damage');
-                 if (!enemy.isBoss) enemy.mesh.position.add(toEnemy.multiplyScalar(1.5));
+                 
+                 // Knockback
+                 if (!enemy.isBoss) {
+                     const kb = toEnemy.normalize().multiplyScalar(1.5);
+                     enemy.mesh.position.add(kb);
+                 }
+
                  if (enemy.isBoss && this.state.activeBoss()) this.state.activeBoss.update(b => b ? { ...b, hp: enemy.hp } : null);
                  
                  if (enemy.hp <= 0) {
                      this.killEnemy(enemy);
                      return false; 
                  }
-                 const mat = enemy.mesh.material as THREE.MeshStandardMaterial;
-                 mat.color.setHex(0xffffff);
-                 setTimeout(() => mat.color.setHex(enemy.isBoss ? 0xa855f7 : 0xef4444), 100);
+                 
+                 // Flash Red
+                 enemy.mesh.traverse((c: any) => {
+                     if (c.isMesh && c.material) {
+                         const oldColor = c.material.color.getHex();
+                         c.material.color.setHex(0xff0000);
+                         setTimeout(() => {
+                             if(c.material) c.material.color.setHex(oldColor);
+                         }, 100);
+                     }
+                 });
              }
           }
           return true; 
       });
 
       if (this.enemies.length === 0 && !this.portal) {
-         this.portal = this.assets.getMesh('portal');
+         this.portal = this.assets.getMesh('portal') as THREE.Mesh;
          this.portal.position.copy(this.playerGroup.position).add(new THREE.Vector3(0, 0, -8)); 
          this.portal.rotation.x = -Math.PI / 2;
          this.portal.position.y = 0.5;
@@ -579,18 +583,7 @@ export class RpgGameService {
       group.rotation.copy(rotation);
       
       const mat1 = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
-      
-      // Adjust geometry to center the arc on the local Y-axis 
-      // which will be mapped to +Z (Forward) by rotation
-      // RingGeometry: 0 rad is +X, PI/2 is +Y.
-      // Arc is PI/6 to 5PI/6 (centered at PI/2).
       const mesh1 = new THREE.Mesh(new THREE.RingGeometry(1.4, 2.6, 16, 1, Math.PI/6, 2*Math.PI/3), mat1);
-      
-      // Rotate around X by +90 degrees.
-      // X axis stays X.
-      // Y axis (Up) -> Z axis (Forward).
-      // Z axis (Forward) -> -Y axis (Down).
-      // This centers the arc (originally at +Y) to +Z, which aligns with player forward direction.
       mesh1.rotateX(Math.PI / 2);
       
       group.add(mesh1);
@@ -598,10 +591,10 @@ export class RpgGameService {
       
       let progress = 0;
       const animate = () => {
-          progress += 0.1;
+          progress += 0.15;
           if (progress >= 1) { this.scene.remove(group); return; }
           group.scale.setScalar(1 + progress * 0.3);
-          
+          mesh1.material.opacity = 1 - progress;
           requestAnimationFrame(animate);
       };
       animate();
@@ -666,7 +659,7 @@ export class RpgGameService {
   dropLoot(position: THREE.Vector3, forcedRarity?: Rarity) {
       const item = this.generateRandomItem(this.state.gameState().currentLevel, forcedRarity);
       const color = this.getRarityColorHex(item.rarity);
-      const mesh = this.assets.getMesh('loot', color);
+      const mesh = this.assets.getMesh('loot', color) as THREE.Mesh;
       mesh.position.copy(position);
       mesh.position.y = 0.5;
       mesh.add(this.assets.createLootBeam(color));

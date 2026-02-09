@@ -14,7 +14,7 @@
     "@angular/platform-browser": "^21.1.0",
     "@angular/core": "^21.1.0",
     "@angular/common": "^21.1.0",
-    "three": "^0.182.0",
+    "three": "0.160.0",
     "@angular/build": "^21.1.0",
     "@angular/cli": "^21.1.0",
     "@angular/compiler-cli": "^21.1.0",
